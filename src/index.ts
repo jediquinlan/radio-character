@@ -1,6 +1,5 @@
 // Components
 export { Character } from "./components/Character/Index";
-export { CharacterTemplate } from "./components/Character/CharacterTemplate";
 
 // State machine
 export { characterMachine } from "./machines/characterMachine";
