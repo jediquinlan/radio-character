@@ -46,8 +46,8 @@ export function Character({
   const scale = width / 200;
 
   return (
-    <View style={{ width, height }}>
-      <View style={{ transform: [{ scale }], transformOrigin: "top left", width: 200, height: 240 }}>
+    <View style={{ width, height, overflow: "hidden" }}>
+      <View style={{ width: 200, height: 240, transform: [{ scale }], transformOrigin: "0% 0%" }}>
         {/* Antennae */}
         <Antenna side="left" displacement={anim.antennaDisplacement} />
         <Antenna side="right" displacement={anim.antennaDisplacement} />
