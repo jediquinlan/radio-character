@@ -53,7 +53,7 @@ export function useAnimationBindings(
   const animEyePointerLeft = useAnimatedProps(() => {
     const angle = eyeRotation.value;
     const jitter =
-      currentState === "idle"
+      currentState === "normal"
         ? Math.sin(Date.now() * 0.003) * 0.05
         : 0;
     const total = angle + jitter;
@@ -67,7 +67,7 @@ export function useAnimationBindings(
   const animEyePointerRight = useAnimatedProps(() => {
     const angle = eyeRotation.value * -1; // mirror
     const jitter =
-      currentState === "idle"
+      currentState === "normal"
         ? Math.sin(Date.now() * 0.003) * 0.05
         : 0;
     const total = angle + jitter;

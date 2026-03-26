@@ -17,38 +17,30 @@ const ANTENNA_SPRING = { damping: 8, stiffness: 200, mass: 1.2 };
 
 /** Map each state to a target eye rotation (radians) */
 const EYE_ROTATION_MAP: Record<CharacterState, number> = {
-  idle: 0,
-  listening: Math.PI * 0.15,       // slight turn — attentive
-  thinking: Math.PI * 0.5,         // half rotation — processing
-  transmitting: Math.PI * 0.75,    // strong rotation — broadcasting
-  error: Math.PI * 0.25,           // 45° — the "X" orientation
+  normal: 0,
+  happy: Math.PI * 0.15,       // slight upward turn
+  sad: -Math.PI * 0.15,        // slight downward turn
 };
 
 /** Map each state to antenna displacement (0–1 normalized) */
 const ANTENNA_MAP: Record<CharacterState, number> = {
-  idle: 0,
-  listening: 0.3,
-  thinking: 0.6,
-  transmitting: 1.0,
-  error: 0.15,
+  normal: 0.2,
+  happy: 0.8,     // perky, raised
+  sad: 0,         // droopy, flat
 };
 
 /** Map each state to oscilloscope amplitude (0–1) */
 const OSCILLOSCOPE_AMP_MAP: Record<CharacterState, number> = {
-  idle: 0.1,        // flat-ish line
-  listening: 0.3,   // gentle wave
-  thinking: 0.5,    // moderate activity
-  transmitting: 1.0, // full waveform
-  error: 0.05,      // near-flatline
+  normal: 0.2,       // gentle idle wave
+  happy: 0.7,        // energetic wave
+  sad: 0.05,         // near-flatline
 };
 
 /** Map each state to oscilloscope frequency multiplier */
 const OSCILLOSCOPE_FREQ_MAP: Record<CharacterState, number> = {
-  idle: 1,
-  listening: 2,
-  thinking: 3,
-  transmitting: 4,
-  error: 8, // high-frequency static/buzz
+  normal: 1.5,
+  happy: 3,          // fast, bouncy
+  sad: 0.8,          // slow, sluggish
 };
 
 export interface CharacterAnimationValues {
@@ -82,9 +74,9 @@ export function useCharacterLogic(
 
   // Shared values — live on the UI thread
   const eyeRotation = useSharedValue(0);
-  const antennaDisplacement = useSharedValue(0);
-  const oscilloscopeAmplitude = useSharedValue(0.1);
-  const oscilloscopeFrequency = useSharedValue(1);
+  const antennaDisplacement = useSharedValue(0.2);
+  const oscilloscopeAmplitude = useSharedValue(0.2);
+  const oscilloscopeFrequency = useSharedValue(1.5);
   const intensity = useSharedValue(0);
 
   // React to state changes — push new targets to UI thread via springs/timings

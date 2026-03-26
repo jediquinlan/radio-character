@@ -1,11 +1,6 @@
 import { setup, assign } from "xstate";
 
-export type CharacterState =
-  | "idle"
-  | "listening"
-  | "thinking"
-  | "transmitting"
-  | "error";
+export type CharacterState = "normal" | "happy" | "sad";
 
 export interface CharacterContext {
   /** Animation intensity from 0.0 (calm) to 1.0 (max energy) */
@@ -17,11 +12,9 @@ export interface CharacterContext {
 export type CharacterEvent =
   | { type: "POWER_ON" }
   | { type: "POWER_OFF" }
-  | { type: "START_LISTENING" }
-  | { type: "START_THINKING" }
-  | { type: "START_TRANSMITTING"; intensity?: number }
-  | { type: "TRIGGER_ERROR" }
-  | { type: "RESET" }
+  | { type: "SET_NORMAL" }
+  | { type: "SET_HAPPY" }
+  | { type: "SET_SAD" }
   | { type: "SET_INTENSITY"; intensity: number };
 
 export const characterMachine = setup({
@@ -31,7 +24,7 @@ export const characterMachine = setup({
   },
 }).createMachine({
   id: "character",
-  initial: "idle",
+  initial: "normal",
   context: {
     intensity: 0.0,
     isPowerOn: true,
@@ -43,69 +36,34 @@ export const characterMachine = setup({
       }),
     },
     POWER_OFF: {
-      target: ".idle",
+      target: ".normal",
       actions: assign({ isPowerOn: false, intensity: 0 }),
     },
     POWER_ON: {
-      target: ".idle",
+      target: ".normal",
       actions: assign({ isPowerOn: true }),
     },
   },
   states: {
-    idle: {
-      entry: assign({ intensity: 0.2 }),
+    normal: {
+      entry: assign({ intensity: 0.3 }),
       on: {
-        START_LISTENING: "listening",
-        START_THINKING: "thinking",
-        START_TRANSMITTING: {
-          target: "transmitting",
-          actions: assign({
-            intensity: ({ event }) => event.intensity ?? 0.7,
-          }),
-        },
-        TRIGGER_ERROR: "error",
+        SET_HAPPY: "happy",
+        SET_SAD: "sad",
       },
     },
-    listening: {
-      entry: assign({ intensity: 0.4 }),
-      on: {
-        START_THINKING: "thinking",
-        START_TRANSMITTING: {
-          target: "transmitting",
-          actions: assign({
-            intensity: ({ event }) => event.intensity ?? 0.7,
-          }),
-        },
-        TRIGGER_ERROR: "error",
-        RESET: "idle",
-      },
-    },
-    thinking: {
-      entry: assign({ intensity: 0.6 }),
-      on: {
-        START_TRANSMITTING: {
-          target: "transmitting",
-          actions: assign({
-            intensity: ({ event }) => event.intensity ?? 0.8,
-          }),
-        },
-        TRIGGER_ERROR: "error",
-        RESET: "idle",
-      },
-    },
-    transmitting: {
+    happy: {
       entry: assign({ intensity: 0.8 }),
       on: {
-        START_LISTENING: "listening",
-        START_THINKING: "thinking",
-        TRIGGER_ERROR: "error",
-        RESET: "idle",
+        SET_NORMAL: "normal",
+        SET_SAD: "sad",
       },
     },
-    error: {
-      entry: assign({ intensity: 1.0 }),
+    sad: {
+      entry: assign({ intensity: 0.2 }),
       on: {
-        RESET: "idle",
+        SET_NORMAL: "normal",
+        SET_HAPPY: "happy",
       },
     },
   },

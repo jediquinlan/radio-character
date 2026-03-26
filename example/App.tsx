@@ -4,16 +4,14 @@ import type { CharacterEvent } from "../src";
 import { Character } from "../src";
 
 const STATES: { label: string; event: CharacterEvent }[] = [
-  { label: "Idle", event: { type: "RESET" } },
-  { label: "Listen", event: { type: "START_LISTENING" } },
-  { label: "Think", event: { type: "START_THINKING" } },
-  { label: "Transmit", event: { type: "START_TRANSMITTING", intensity: 0.9 } },
-  { label: "Error", event: { type: "TRIGGER_ERROR" } },
+  { label: "Normal", event: { type: "SET_NORMAL" } },
+  { label: "Happy", event: { type: "SET_HAPPY" } },
+  { label: "Sad", event: { type: "SET_SAD" } },
 ];
 
 export default function App() {
   const [send, setSend] = useState<((e: CharacterEvent) => void) | null>(null);
-  const [active, setActive] = useState("Idle");
+  const [active, setActive] = useState("Normal");
 
   const handleActorRef = useCallback(
     (sendFn: (e: CharacterEvent) => void) => {
