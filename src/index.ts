@@ -1,8 +1,6 @@
 // Components
 export { Character } from "./components/Character/Index";
-export { EyeKnob } from "./components/Character/EyeKnob";
-export { Antenna } from "./components/Character/Antenna";
-export { Oscilloscope } from "./components/Character/Oscilloscope";
+export { CharacterTemplate } from "./components/Character/CharacterTemplate";
 
 // State machine
 export { characterMachine } from "./machines/characterMachine";
