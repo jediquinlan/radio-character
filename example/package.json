@@ -16,14 +16,15 @@
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "react-native": "0.83.2",
-    "react-native-reanimated": "3",
     "react-native-svg": "15.15.3",
     "react-native-web": "^0.21.0",
     "xstate": "^5.29.0"
   },
   "devDependencies": {
+    "@babel/core": "^7.29.0",
     "@types/react": "~19.2.2",
     "babel-preset-expo": "^55.0.12",
+    "react-refresh": "^0.17.0",
     "typescript": "~5.9.2"
   },
   "private": true

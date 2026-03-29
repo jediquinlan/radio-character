@@ -1,6 +1,9 @@
 {
   "name": "@radio-lingo/character",
   "version": "0.2.0",
+  "workspaces": [
+    "example"
+  ],
   "main": "src/index.ts",
   "types": "src/index.ts",
   "scripts": {
@@ -8,16 +11,18 @@
   },
   "peerDependencies": {
     "react": ">=18",
-    "react-native": ">=0.73"
+    "react-native": ">=0.73",
+    "react-native-svg": ">=13"
   },
   "dependencies": {
-    "xstate": "^5.19.0",
-    "@xstate/react": "^4.1.0"
+    "@xstate/react": "^4.1.0",
+    "xstate": "^5.19.0"
   },
   "devDependencies": {
     "@types/react": "~19.1.0",
     "react": "^19.2.0",
     "react-native": "^0.83.2",
+    "react-native-svg": "^15.15.4",
     "typescript": "~5.9.2"
   }
 }
