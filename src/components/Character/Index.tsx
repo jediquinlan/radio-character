@@ -130,26 +130,82 @@ export function Character({
 const HAPPY_OFFSET = -20;
 const SAD_OFFSET = 20;
 
+/** Each happy variant is a function: (t, time, i, centerY, amplitude) => y */
+type WaveFunc = (t: number, time: number, i: number, centerY: number, amp: number) => number;
+
+function quiver(time: number, i: number): number {
+  return Math.sin(time * 15 + i * 2.3) * 3 + Math.sin(time * 23 + i * 1.7) * 2;
+}
+
+const HAPPY_VARIANTS: WaveFunc[] = [
+  // 0: Classic smile arc
+  (t, time, i, cy, amp) => {
+    const arc = -4 * (t - 0.5) * (t - 0.5) + 1;
+    return cy + HAPPY_OFFSET + arc * amp * 2 + quiver(time, i);
+  },
+  // 1: Wide grin — flatter, broader curve
+  (t, time, i, cy, amp) => {
+    const arc = 1 - Math.pow(2 * t - 1, 4);
+    return cy + HAPPY_OFFSET + arc * amp * 1.6 + quiver(time, i);
+  },
+  // 2: Excited zigzag smile
+  (t, time, i, cy, amp) => {
+    const arc = -4 * (t - 0.5) * (t - 0.5) + 1;
+    const zig = Math.sin(t * Math.PI * 8 + time * 6) * 8;
+    return cy + HAPPY_OFFSET + arc * amp * 1.8 + zig + quiver(time, i);
+  },
+  // 3: Open mouth — deep U shape
+  (t, time, i, cy, amp) => {
+    const arc = Math.pow(1 - Math.pow(2 * t - 1, 2), 0.5);
+    return cy + HAPPY_OFFSET + arc * amp * 2.5 + quiver(time, i);
+  },
+];
+
+const SAD_VARIANTS: WaveFunc[] = [
+  // 0: Classic frown arc
+  (t, time, i, cy, amp) => {
+    const arc = -4 * (t - 0.5) * (t - 0.5) + 1;
+    return cy + SAD_OFFSET - arc * amp * 2 + quiver(time, i);
+  },
+  // 1: Wobbly frown — slow wobble on a down arc
+  (t, time, i, cy, amp) => {
+    const arc = -4 * (t - 0.5) * (t - 0.5) + 1;
+    const wobble = Math.sin(t * Math.PI * 3 + time * 1.5) * 6;
+    return cy + SAD_OFFSET - arc * amp * 1.8 + wobble + quiver(time, i);
+  },
+  // 2: Flat droop — nearly flat with sagging center
+  (t, time, i, cy, amp) => {
+    const sag = Math.pow(1 - Math.pow(2 * t - 1, 2), 2);
+    return cy + SAD_OFFSET - sag * amp * 1.4 + quiver(time, i);
+  },
+  // 3: Trembling line — barely curved, lots of quiver
+  (t, time, i, cy, amp) => {
+    const arc = -4 * (t - 0.5) * (t - 0.5) + 1;
+    const tremble = Math.sin(time * 25 + i * 3.1) * 5 + Math.sin(time * 31 + i * 2.7) * 4;
+    return cy + SAD_OFFSET - arc * amp * 0.8 + tremble;
+  },
+];
+
+interface VariantPair {
+  happy: number;
+  sad: number;
+}
+
 function waveYForState(
   state: "normal" | "happy" | "sad",
   t: number,
   time: number,
   i: number,
+  variants: VariantPair,
 ): number {
   const { centerY, amplitude } = OSC;
-  const quiver =
-    state !== "normal"
-      ? Math.sin(time * 15 + i * 2.3) * 3 + Math.sin(time * 23 + i * 1.7) * 2
-      : 0;
 
   if (state === "normal") {
     return centerY - Math.sin(t * Math.PI * 4 + time * 3) * amplitude;
   } else if (state === "happy") {
-    const arc = -4 * (t - 0.5) * (t - 0.5) + 1;
-    return centerY + HAPPY_OFFSET + arc * amplitude * 2 + quiver;
+    return HAPPY_VARIANTS[variants.happy](t, time, i, centerY, amplitude);
   } else {
-    const arc = -4 * (t - 0.5) * (t - 0.5) + 1;
-    return centerY + SAD_OFFSET - arc * amplitude * 2 + quiver;
+    return SAD_VARIANTS[variants.sad](t, time, i, centerY, amplitude);
   }
 }
 
@@ -158,6 +214,8 @@ function buildWavePath(
   toState: CharacterState,
   blend: number,
   time: number,
+  fromVariants: VariantPair,
+  toVariants: VariantPair,
 ): string {
   const { left, right, segments } = OSC;
   const width = right - left;
@@ -166,8 +224,8 @@ function buildWavePath(
   for (let i = 0; i <= segments; i++) {
     const t = i / segments;
     const x = left + t * width;
-    const yFrom = waveYForState(fromState, t, time, i);
-    const yTo = waveYForState(toState, t, time, i);
+    const yFrom = waveYForState(fromState, t, time, i, fromVariants);
+    const yTo = waveYForState(toState, t, time, i, toVariants);
     const y = yFrom + (yTo - yFrom) * blend;
     points.push(`${i === 0 ? "M" : "L"}${x.toFixed(1)} ${y.toFixed(1)}`);
   }
@@ -177,6 +235,13 @@ function buildWavePath(
 
 const TWEEN_DURATION = 400; // ms to blend between states
 
+function pickVariants(): VariantPair {
+  return {
+    happy: Math.floor(Math.random() * HAPPY_VARIANTS.length),
+    sad: Math.floor(Math.random() * SAD_VARIANTS.length),
+  };
+}
+
 function OscilloscopeWave({ currentState, isPowerOn }: { currentState: CharacterState; isPowerOn: boolean }) {
   const [pathD, setPathD] = useState("");
   const rafRef = useRef<number>(0);
@@ -184,6 +249,8 @@ function OscilloscopeWave({ currentState, isPowerOn }: { currentState: Character
   const prevStateRef = useRef<CharacterState>(currentState);
   const tweenStartRef = useRef(0);
   const tweenFromRef = useRef<CharacterState>(currentState);
+  const fromVariantsRef = useRef<VariantPair>(pickVariants());
+  const toVariantsRef = useRef<VariantPair>(fromVariantsRef.current);
 
   useEffect(() => {
     if (!isPowerOn) {
@@ -193,8 +260,16 @@ function OscilloscopeWave({ currentState, isPowerOn }: { currentState: Character
 
     // Start a tween from whatever we were showing to the new state
     tweenFromRef.current = prevStateRef.current;
+    fromVariantsRef.current = { ...toVariantsRef.current };
     tweenStartRef.current = Date.now();
     prevStateRef.current = currentState;
+
+    // Pick a new random variant each time we enter happy or sad
+    if (currentState === "happy") {
+      toVariantsRef.current = { ...toVariantsRef.current, happy: Math.floor(Math.random() * HAPPY_VARIANTS.length) };
+    } else if (currentState === "sad") {
+      toVariantsRef.current = { ...toVariantsRef.current, sad: Math.floor(Math.random() * SAD_VARIANTS.length) };
+    }
 
     if (rafRef.current) return; // already running
 
@@ -206,7 +281,10 @@ function OscilloscopeWave({ currentState, isPowerOn }: { currentState: Character
       const tweenElapsed = now - tweenStartRef.current;
       const blend = Math.min(tweenElapsed / TWEEN_DURATION, 1);
 
-      setPathD(buildWavePath(tweenFromRef.current, prevStateRef.current, blend, elapsed));
+      setPathD(buildWavePath(
+        tweenFromRef.current, prevStateRef.current, blend, elapsed,
+        fromVariantsRef.current, toVariantsRef.current,
+      ));
       rafRef.current = requestAnimationFrame(tick);
     };
 
