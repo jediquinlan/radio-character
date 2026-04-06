@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Animated } from "react-native";
 import Svg, { G, Path, Circle } from "react-native-svg";
 import { useMachine } from "@xstate/react";
@@ -6,7 +6,46 @@ import { characterMachine } from "../../machines/characterMachine";
 import { useCharacterLogic } from "../../hooks/useCharacterLogic";
 import type { CharacterEvent, CharacterState } from "../../machines/characterMachine";
 
-const AnimatedG = Animated.createAnimatedComponent(G);
+/**
+ * A <G> that rotates around a given origin, driven by an Animated.Value.
+ * We listen to the value and set a transform string manually because
+ * AnimatedG + originX/originY doesn't work reliably in react-native-svg.
+ */
+function RotatingG({
+  source,
+  inputRange,
+  outputRange,
+  originX,
+  originY,
+  children,
+}: {
+  source: Animated.Value;
+  inputRange?: number[];
+  outputRange?: number[];
+  originX: number;
+  originY: number;
+  children: React.ReactNode;
+}) {
+  const [transform, setTransform] = useState(
+    `translate(${originX}, ${originY}) rotate(0) translate(${-originX}, ${-originY})`
+  );
+
+  useEffect(() => {
+    const id = source.addListener(({ value }: { value: number }) => {
+      let degrees = value;
+      if (inputRange && outputRange) {
+        const t = (value - inputRange[0]) / (inputRange[1] - inputRange[0]);
+        degrees = outputRange[0] + t * (outputRange[1] - outputRange[0]);
+      }
+      setTransform(
+        `translate(${originX}, ${originY}) rotate(${degrees}) translate(${-originX}, ${-originY})`
+      );
+    });
+    return () => source.removeListener(id);
+  }, [source, inputRange, outputRange, originX, originY]);
+
+  return <G transform={transform}>{children}</G>;
+}
 
 interface CharacterProps {
   width?: number;
@@ -49,25 +88,13 @@ export function Character({
     onActorRef?.(send);
   }, [send, onActorRef]);
 
-  const leftEyeRotation = anim.eyeRotation.interpolate({
-    inputRange: [-Math.PI * 4, Math.PI * 4],
-    outputRange: [-720, 720],
-  });
-
-  const rightEyeRotation = anim.eyeRotation.interpolate({
-    inputRange: [-Math.PI * 4, Math.PI * 4],
-    outputRange: [720, -720],
-  });
-
-  const leftAntennaRotation = anim.antennaDisplacement.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -15],
-  });
-
-  const rightAntennaRotation = anim.antennaDisplacement.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 15],
-  });
+  // Interpolation ranges — applied inside RotatingG listeners
+  const eyeInputRange = [-Math.PI * 4, Math.PI * 4];
+  const leftEyeOutputRange = [-720, 720];
+  const rightEyeOutputRange = [720, -720];
+  const antennaInputRange = [0, 1];
+  const leftAntennaOutputRange = [0, -15];
+  const rightAntennaOutputRange = [0, 15];
 
   return (
     <Svg width={width} height={height} viewBox="0 0 656.6 799.24">
@@ -86,29 +113,35 @@ export function Character({
       </G>
 
       {/* ── Left Antenna (pivot: bottom-right) ── */}
-      <AnimatedG
-        rotation={leftAntennaRotation}
+      <RotatingG
+        source={anim.antennaDisplacement}
+        inputRange={antennaInputRange}
+        outputRange={leftAntennaOutputRange}
         originX={LEFT_ANT_PIVOT.x}
         originY={LEFT_ANT_PIVOT.y}
       >
         <Path fill="#8b6c49" d="M123.6 61.64c6.5 2.3 12.8 3.3 19.5.4 1.8-2.4 3.4-1.9 5.2-.3 3.6 3.3 7.4 6.5 11.2 10.1 1.7 1.4 3.3 2.5 5 3.9 6.1 5.4 12.1 10.5 18.1 16 .6.8 1.2 1.3 1.9 2.1 2.6 1.9 5 3.4 7.4 5.1 4.4 3.2 8.8 6.4 13.4 9.9 7.5 1.7 14 0 20.5-4 3.5-4.3 6.8-8.6 10.2-13.1 3.4-5.3 6.6-10.4 10-15.7 4-4.2 6.7-4.4 12.8-1.1 2.8-1.9 5.3-3.9 7.8-6.2 0-.9-.2-1.5-.4-2.3-5.8-2.9-11.4-5.9-18.5-3.7-4.2 2.9-8 5.8-12 8.9-3 4.2-5.7 8.2-8.7 12.3-1.6 2.6-2.8 5-4.2 7.8-3.6 6.8-12.1 8.7-17.4 3.6-6.9-5.8-13.7-11.2-20.7-16.9-2.4-2.2-4.7-4.1-7.1-6.2v-.3s-.4 0-.6-.1c-4.2-3.4-8.1-6.8-12.3-10.4-3.7-3.7-7.3-7.1-10.6-10.7-.3-6.4-.9-12.7-1.6-19.3-2.7-2.9-5.2-5.4-8.4-8.1-7.2-3.1-13.9-3-20.8-.2-3 2.8-5.8 5.5-8.6 8.4-3 6.9-4 13.4-1 20.2 3.2 3.2 6.5 6.3 10 9.7z" />
         <Path fill="#8b6c49" d="M273.8 95.84c1.5-1.9 3.1-3.8 4.5-6.1-1.2-2.8-2.4-5.3-3.9-7.7-5.8 3.6-6 9-.6 13.8m24.7 37.6c-3-6.8-6-13.2-8.9-20-1-2.2-1.9-4-2.9-6.1-2.1-4.7-4.1-9.1-6.2-13.8-.6-1.2-1.2-2-1.9-3.1-1.7 1.6-3.2 3.6-4.8 5.5-5.4-4.8-5.3-10.2.6-13.8-.7-3-1.9-6-3.4-9.5-1.7-1.7-3-2.9-4.4-3.8-2.5 2.4-5 4.4-7.5 6.4 2.2 4 4.3 8 6.5 12.3 3.9 8.5 7.7 16.5 11.6 25 3.1 6.8 6.1 13.4 9.2 20.2.5 1.4.9 2.4 1.4 3.7 2.2 4.5 4.4 8.7 6.6 13.2.4 1.1.8 1.9 1.1 3v.4c.7 1.1 1.4 2.2 2 3.7 3.6.3 7.2.2 11.3 0-.3-2.2-1.1-4.4-1.9-6.9-2.8-5.6-5.6-10.8-8.5-16.3z" />
         <Path fill="#d2ac78" d="M129.31 53.17c4.3 2 9.2 1.4 12.8-3.3.7-1.5 1.4-2.8 1.6-4 .6-4.6-.2-8.9-4.3-11.5-3.8-2.4-8.2-2.6-12.3-.1-4.3 2.7-5.4 7.1-4.1 11.4.9 3 3.5 6.3 6.3 7.5" />
-      </AnimatedG>
+      </RotatingG>
 
       {/* ── Right Antenna (pivot: bottom-left) ── */}
-      <AnimatedG
-        rotation={rightAntennaRotation}
+      <RotatingG
+        source={anim.antennaDisplacement}
+        inputRange={antennaInputRange}
+        outputRange={rightAntennaOutputRange}
         originX={RIGHT_ANT_PIVOT.x}
         originY={RIGHT_ANT_PIVOT.y}
       >
         <Path fill="#7a644e" d="M472.1 83.34c3.1-3.7 5.8-7.3 8.8-11.1 3.6-5.6 7-11 10.4-16.7.9-1.5 1.7-2.8 2.7-4.3 2.9-5.9 6-10.6 13.6-8.3 1.1.4 2.6-.2 4.3-.4 6.1-2.3 10.9-5.7 14.4-11.3 2.9-7.1 2.4-13.7-.8-20.8-4.4-3.6-8.5-6.8-13.2-10-7.8-1.4-14.2.6-20.1 5.4-1.7 1.7-3.3 3.2-4.9 4.7-.4 1.8-1.1 3.7-1.1 5.6 0 4.7.5 9.4.9 14.5 3.9 3.8 3.8 7.2.5 11.1-2.3 2.8-4.1 6-6.3 9.3-3.3 5.2-6.3 10.1-9.7 15.2-1.4 2-2.4 3.8-3.8 5.8-5.4 5.7-11 5.9-16.4.5-.5-.4-.7-.5-1.1-1-5.7-6.4-11.2-12.5-17-19-1.4-1.4-2.6-2.6-3.9-4-5.5-4.9-11.7-5.4-18.7-3.9-3.6 2.2-6.7 4.4-10.2 6.5-3.4 7.1-6.4 14.1-9.9 21.1h-.4c-.5 2.5-1 5-1.8 7.7-1.7 4.2-3.1 8.2-4.8 12.5-2.8 7-5.4 13.6-8.2 20.6-2.2 5.6-4.1 11-6.2 16.8-.6 1.2-1 2.1-1.6 3.3-2.5 6.4-4.5 12.7-7 18.8-.5 1.2-2.6 2.3-4.1 2.5-2.4.4-4.9 0-7.9 0-.7.7-1 1.5-1.4 2.6 4.8.9 9.6 1.9 14.5 2.1 2.7.1 5.4-1 8.4-1.8.6-1.2 1-2.1 1.7-3.1 2.5-6.9 4.9-13.6 7.3-20.6 3.1-7.4 6-14.5 9.1-21.9 2.6-6.6 4.9-12.8 7.6-19.2 2.7-7 5.2-13.8 7.9-20.8 2.1-4.8 4-9.3 6.2-14 5.7-5.1 8.8-4.7 15.2 2.3 5.5 6.2 10.6 12.2 16.2 17.9 2.8 2.9 6.3 5.2 9.7 8.1 7.4 2.5 14.1 1.8 20.9-2.2z" />
         <Path fill="#d2ac78" d="M503 31.44c4.3 2 9.2 1.4 12.8-3.3.7-1.5 1.4-2.8 1.6-4 .6-4.6-.2-8.9-4.3-11.5-3.8-2.4-8.2-2.6-12.3-.1-4.3 2.7-5.4 7.1-4.1 11.4.9 3 3.5 6.3 6.3 7.5" />
-      </AnimatedG>
+      </RotatingG>
 
       {/* ── Left Eye (rotate from center) ── */}
-      <AnimatedG
-        rotation={leftEyeRotation}
+      <RotatingG
+        source={anim.eyeRotation}
+        inputRange={eyeInputRange}
+        outputRange={leftEyeOutputRange}
         originX={LEFT_EYE_CENTER.x}
         originY={LEFT_EYE_CENTER.y}
       >
@@ -118,11 +151,13 @@ export function Character({
         <Path fill="#9e7342" d="M219.9 274.14c-2 2.4-3.7 4.6-5.6 6.8-4.2 4.9-8.4 9.8-13 14.4-1 1-4.1 1.3-5.1.5-1-.9-1-3.4-.8-5.2 0-1 1.1-2 1.9-2.8 7.7-8.9 15.5-17.7 23.2-26.6 0-1.1 0-2.2-.3-3.5-4.4 3.5-8.7 7-12.6 10.9q-12.75 12.6-24.9 25.8c.6 1.5 1 2.9 1.6 4.1-.6-1.2-1.1-2.6-1.9-3.9-4.1 3.1-8 6.3-11.5 9.8-15.4 15.2-30.7 30.5-45.8 45.9-1.7 1.8-2.4 4.5-3.4 7.2.2.7.2 1.1.4 1.3 7.4 6.9 14.8 13.9 22.5 20.4 1.1.9 4.7.4 6.1-.8 3.2-2.8 6-6.2 8.6-9.7 8.3-11.5 16.3-23 24.6-34.9l19.8-29.7c-4.6-1.6-9.1-3.8-14.3-1.6-.7.3-2.3-.6-3.3-1.6 1.1 1 2.6 1.9 3.3 1.6 5.2-2.2 9.7 0 14.6 1.4 2.4-3.7 4.6-7.3 6.7-10.8 0-.3.2-.7.3-1v.8c.3-.6.5-1.1.5-1.5 0-.1.2-.2.3-.3 4-5.7 7.5-11.4 10.9-17h-.4c-.9 0-1.4 0-2.2.1z" />
         <Path fill="#7a644e" d="M223.6 248.14c-4.7.7-9.4 1.9-14 2.9-17.2 16.9-34.3 33.8-51.5 50.6-13.2 12.9-26.6 25.5-39.9 38.3-.8.8-1.8 1.4-3.4 2.2-2.9 2.5-5.2 4.8-7.4 7.4.5 1.4.8 2.5 1.2 3.6 1.6.1 2.4.6 2.8 1.3-.3-.6-1.1-1-2.7-1 .7 2.1 1.3 3.9 2.1 5.3.2-.8.4-1.5.6-2.2-.2.8-.4 1.6-.6 2.5-.2.7-.2.9-.2 1.1 3.4-1 6.7-2 10.5-3 1.5-2.3 2.2-5.1 3.9-6.9 15.2-15.4 30.5-30.7 45.8-45.9 3.5-3.5 7.4-6.7 11.4-10.1 8.7-8.7 16.9-17.2 25.4-25.6 3.9-3.9 8.2-7.5 12.6-11.4 2.2-1.2 4-2.1 6.3-3.1.8 0 1.1.1 1.8-.2 1.4-4.7-.9-6.3-4.7-5.8" />
         <Path fill="#7a644e" d="M198.2 327.74c-4.7 2-9.3 4.2-14.3 6.4-8.5 11.5-16.6 23.1-24.8 34.6-2.5 3.5-5.3 6.9-8.6 9.7-1.3 1.2-5 1.7-6.1.8-7.7-6.5-15-13.5-22.5-20.4-.2-.2-.2-.6-.8-1.2-3.8.7-7.2 1.7-10.6 3.1 0 1.5.2 2.6.3 3.7 1.5.8 3.3 1.4 4.6 2.5 8.6 7 17.1 14.1 25.6 21.3 1.2 1 2.1 2.4 3.8 4 4.9-.3 9.3-.9 13.7-1.6 2.1-2.4 4.3-4.8 6.8-7.2 2.2-3.6 3.9-7.4 6.1-10.8 9.9-14.9 20-29.7 30.1-44.9-1-.1-2.2-.2-3.2.2z" />
-      </AnimatedG>
+      </RotatingG>
 
       {/* ── Right Eye (rotate from center) ── */}
-      <AnimatedG
-        rotation={rightEyeRotation}
+      <RotatingG
+        source={anim.eyeRotation}
+        inputRange={eyeInputRange}
+        outputRange={rightEyeOutputRange}
         originX={RIGHT_EYE_CENTER.x}
         originY={RIGHT_EYE_CENTER.y}
       >
@@ -131,7 +166,7 @@ export function Character({
         <Path fill="#4c4034" d="M457.3 400.54c.2 8.1 1.4 9.5 9 9.4 9.2 0 18.5-.4 27.7-.9 8.2-.4 9.2-1.6 8.8-10-15.5.3-30.5.6-45.5 1.4z" />
         <Path fill="#9e7342" d="M494.5 345.04v-3c-.3-2.2-.6-3.6-.9-5.4-2-17.6-3.9-34.8-5.9-52.3l-4.7.9c-.5 3.9 1 8.9-6.1 9.6-10-.6-4.5-8.4-7.2-13.2-1.8 20.3-3.5 39.9-5.1 59.9-1 14.8-2 29.2-3 43.5-.2 3.6 1.2 5.1 4.9 5 8.2-.1 16.3 0 24.5 0 7.4 0 8.3-.7 7.6-8-1.2-12.3-2.6-24.7-3.9-37z" />
         <Path fill="#7a644e" d="M510.6 386.44c0-1.1.6-2.2.9-3.7-.7-3.1-1.3-5.9-2-8.6-1.9-14.8-3.8-29.5-5.7-44.3-.5-4.2-.9-8.5-1.7-13.1-5.8 3.9-5 10.4-6.7 16.1-.5 1.5-1.3 2.9-1.9 4.4.3 1.5.6 3.1.9 4.6.3 1.3.5 2.3.4 3.3 1 12.4 2.4 24.7 3.6 37.1.7 7.2-.2 8-7.6 8-8.2 0-16.3-.1-24.5 0-3.7 0-5.2-1.4-4.9-5 1-14.4 2-28.8 2.6-43.6-1.1-1.7-2.3-2.9-2.4-4.2-1.2-11.3-2-22.6-3.2-33.9-.2-1.5-1.4-2.9-2.1-4.3-.6 4.2-1.4 8.4-1.7 12.7-1.5 20.8-2.8 41.5-4.3 63.1-3.2 3.5-1.9 7-1.7 10.7.9 6.4 2.7 11.8 8.7 14.6 15-.3 30.1-.7 45.8-1.2 5.1-3.1 8.1-6.7 7.6-12.5z" />
-      </AnimatedG>
+      </RotatingG>
 
       {/* ── Power LED ── */}
       <Circle cx={580} cy={195} r={10} fill={anim.isPowerOn ? COLORS.ledOn : COLORS.ledOff} />

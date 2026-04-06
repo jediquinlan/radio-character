@@ -41,12 +41,17 @@ export function useCharacterLogic(
   const antennaDisplacement = useRef(new Animated.Value(0.2)).current;
   const oscilloscopeAmplitude = useRef(new Animated.Value(0.2)).current;
   const antennaLoopRef = useRef<Animated.CompositeAnimation | null>(null);
+  const idleEyeRef = useRef<{ stop: () => void } | null>(null);
 
   useEffect(() => {
-    // Stop any running antenna wiggle
+    // Stop any running loops
     if (antennaLoopRef.current) {
       antennaLoopRef.current.stop();
       antennaLoopRef.current = null;
+    }
+    if (idleEyeRef.current) {
+      idleEyeRef.current.stop();
+      idleEyeRef.current = null;
     }
 
     if (!isPowerOn) {
@@ -125,6 +130,26 @@ export function useCharacterLogic(
         mass: 1.2,
         useNativeDriver: false,
       }).start();
+
+      // Idle eye wander for normal state
+      if (currentState === "normal") {
+        let running = true;
+        const wander = () => {
+          if (!running) return;
+          const target = (Math.random() - 0.5) * Math.PI * 0.3; // small random range
+          const duration = 1500 + Math.random() * 2000; // 1.5–3.5s
+          Animated.timing(eyeRotation, {
+            toValue: target,
+            duration,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: false,
+          }).start(({ finished }) => {
+            if (finished && running) wander();
+          });
+        };
+        wander();
+        idleEyeRef.current = { stop: () => { running = false; } };
+      }
     }
 
     Animated.spring(oscilloscopeAmplitude, {
